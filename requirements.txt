@@ -1,0 +1,3 @@
+stereo3d
+i3drsgm
+stereo-mideval
