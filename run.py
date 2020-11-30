@@ -11,6 +11,7 @@ from i3drsgm import I3DRSGM, StereoSupport
 import time
 import cv2
 import ssl
+import glob
 
 def puttext_multiline(img, text, org, font,  
                     fontScale, color, thickness, lineType=cv2.LINE_AA, line_spacing=1.5, outline_color=None):
@@ -108,7 +109,7 @@ disp_range = 16*270
 interp = False
 
 # Initalise I3DRSGM
-i3drsgm = I3DRSGM("2020_02_21_I3DRWL001_WINDOWS.lic")
+i3drsgm = I3DRSGM(glob.glob("*.lic")[0])
 # Check initalisation was success
 if i3drsgm.isInit():
     image_height, image_width = 0,0
