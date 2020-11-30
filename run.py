@@ -8,6 +8,7 @@ import os
 import numpy as np
 from stereomideval import Dataset, Eval
 from i3drsgm import I3DRSGM
+import ssl
 
 dataset_folder = os.path.join(os.getcwd(),"datasets") #Path to dowmload datasets
 
@@ -18,6 +19,10 @@ if not os.path.exists(dataset_folder):
 # Initalise stereomideval objects
 stmid_dataset = Dataset()
 stmid_eval = Eval()
+
+# SSL Verificaiton may be need if you get the following error:
+# "urllib.error.URLError: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1091)>"
+ssl._create_default_https_context = ssl._create_unverified_context
 
 i3drsgm = I3DRSGM()
 if i3drsgm.isInit():
