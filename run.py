@@ -9,10 +9,11 @@ import shutil
 import glob
 import ssl
 import numpy as np
+import cv2
 from stereomideval.structures import MatchData
 from stereomideval.dataset import Dataset
 from stereomideval.eval import Eval, Timer
-from stereomideval import colormap_disp
+from stereomideval import colormap_disp, image_resize
 from i3drsgm import I3DRSGM
 
 DATASET_FOLDER = os.path.join(os.getcwd(),"datasets") #Path to download datasets
@@ -20,7 +21,8 @@ EVAL_FOLDER = os.path.join(os.getcwd(),"evaluation") #Path to store evaluation
 GET_METRIC_RANK = False
 GET_AV_METRIC_RANK = True
 MIN_DISP = 0
-INTERP = False
+DISP_RANGE = 16*250
+INTERP = True
 
 # SSL Verificaiton may be need if you get the following error:
 # "urllib.error.URLError: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1091)>"
@@ -62,7 +64,7 @@ if i3drsgm.isInit():
         ground_truth_disp_image = scene_data.disp_image
         ndisp = scene_data.ndisp
 
-        disp_range = 16*ndisp
+        disp_range = DISP_RANGE
 
         # Get test data image dims
         new_image_height = left_image.shape[0]
@@ -84,6 +86,11 @@ if i3drsgm.isInit():
         # Stereo match image pair
         print("Running I3DRSGM on images...")
         valid, test_disp_image = i3drsgm.forwardMatch(left_image,right_image)
+        # I3DRSGM result is negative, invert it
+        test_disp_image = -test_disp_image.astype(np.float32)
+        # Non matched pixel have value of 99999, replace with zero (zero is ignored in evaluation)
+        test_disp_image[test_disp_image==99999]=0.0
+        test_disp_image[test_disp_image<=0]=0.0
 
         # Record elapsed time for match
         elapsed_time = timer.elapsed()
@@ -93,8 +100,9 @@ if i3drsgm.isInit():
                 left_image,right_image,ground_truth_disp_image,test_disp_image,elapsed_time,ndisp)
             match_data = MatchData(scene_info,match_result)
             match_data_list.append(match_data)
-            cv2.imshow("Match",colormap_disp(test_disp_image))
-            cv2.waitKey(0)
+            resize_disp_image = image_resize(colormap_disp(test_disp_image),width=480)
+            cv2.imshow("Match",resize_disp_image)
+            cv2.waitKey(1)
         else:
             i3drsgm.close()
             raise Exception("Match failed!")
@@ -102,7 +110,7 @@ if i3drsgm.isInit():
     # Required to release memory
     i3drsgm.close()
 
-    Eval.evaluate_match_data_list(match_data_list,GET_METRIC_RANK,GET_AV_METRIC_RANK)
+    Eval.evaluate_match_data_list(match_data_list,GET_METRIC_RANK,GET_AV_METRIC_RANK,INTERP)
 else:
     # Required to release memory
     i3drsgm.close()
