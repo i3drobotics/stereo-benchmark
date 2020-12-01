@@ -2,3 +2,5 @@
 /datasets
 *.lic
 *.log
+/__pycache__
+/evaluation
