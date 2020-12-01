@@ -12,6 +12,7 @@ import numpy as np
 from stereomideval.structures import MatchData
 from stereomideval.dataset import Dataset
 from stereomideval.eval import Eval, Timer
+from stereomideval import colormap_disp
 from i3drsgm import I3DRSGM
 
 DATASET_FOLDER = os.path.join(os.getcwd(),"datasets") #Path to download datasets
@@ -92,6 +93,8 @@ if i3drsgm.isInit():
                 left_image,right_image,ground_truth_disp_image,test_disp_image,elapsed_time,ndisp)
             match_data = MatchData(scene_info,match_result)
             match_data_list.append(match_data)
+            cv2.imshow("Match",colormap_disp(test_disp_image))
+            cv2.waitKey(0)
         else:
             i3drsgm.close()
             raise Exception("Match failed!")
