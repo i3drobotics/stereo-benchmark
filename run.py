@@ -23,6 +23,7 @@ GET_AV_METRIC_RANK = True
 MIN_DISP = 0
 DISP_RANGE = 16*250
 INTERP = True
+DOWNSAMPLE_RATE = 1.0
 
 # SSL Verificaiton may be need if you get the following error:
 # "urllib.error.URLError: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1091)>"
@@ -61,10 +62,14 @@ if i3drsgm.isInit():
             dataset_type=dataset_type)
         left_image = scene_data.left_image
         right_image = scene_data.right_image
-        ground_truth_disp_image = scene_data.disp_image
-        ndisp = scene_data.ndisp
+        ground_truth = scene_data.disp_image
+        ndisp = scene_data.ndisp * DOWNSAMPLE_RATE
 
         disp_range = DISP_RANGE
+
+        left_image = cv2.resize(left_image,fx=DOWNSAMPLE_RATE,fy=DOWNSAMPLE_RATE,interpolation=cv2.INTER_AREA,dsize=None)
+        right_image = cv2.resize(right_image,fx=DOWNSAMPLE_RATE,fy=DOWNSAMPLE_RATE,interpolation=cv2.INTER_AREA,dsize=None)
+        ground_truth = cv2.resize(ground_truth,fx=DOWNSAMPLE_RATE,fy=DOWNSAMPLE_RATE,interpolation=cv2.INTER_AREA,dsize=None)
 
         # Get test data image dims
         new_image_height = left_image.shape[0]
@@ -86,18 +91,27 @@ if i3drsgm.isInit():
         # Stereo match image pair
         print("Running I3DRSGM on images...")
         valid, test_disp_image = i3drsgm.forwardMatch(left_image,right_image)
+
+        # Record elapsed time for match
+        elapsed_time = timer.elapsed()
+
         # I3DRSGM result is negative, invert it
         test_disp_image = -test_disp_image.astype(np.float32)
         # Non matched pixel have value of 99999, replace with zero (zero is ignored in evaluation)
         test_disp_image[test_disp_image==99999]=0.0
         test_disp_image[test_disp_image<=0]=0.0
+        test_disp_image[test_disp_image>=ndisp]=ndisp
+        test_disp_image = np.nan_to_num(test_disp_image, nan=0.0,posinf=0.0,neginf=0.0)
+        test_disp_image = test_disp_image.astype(ground_truth.dtype)
 
-        # Record elapsed time for match
-        elapsed_time = timer.elapsed()
+        print(ground_truth)
+        print(test_disp_image)
+
+        
 
         if valid:
             match_result = MatchData.MatchResult(
-                left_image,right_image,ground_truth_disp_image,test_disp_image,elapsed_time,ndisp)
+                left_image,right_image,ground_truth,test_disp_image,elapsed_time,ndisp)
             match_data = MatchData(scene_info,match_result)
             match_data_list.append(match_data)
             resize_disp_image = image_resize(colormap_disp(test_disp_image),width=480)

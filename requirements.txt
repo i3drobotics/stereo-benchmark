@@ -1,3 +1,3 @@
 stereo3d >= 0.0.3
 i3drsgm >= 1.0.6.3
-stereo-mideval >= 1.0.18
+stereo-mideval >= 1.0.19
