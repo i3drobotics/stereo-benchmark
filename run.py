@@ -10,11 +10,11 @@ import glob
 import ssl
 import numpy as np
 import cv2
-from stereomideval.structures import MatchData
-from stereomideval.dataset import Dataset
+from stereomideval.structures import MatchData, DatasetType
+from stereomideval.dataset import Dataset, SceneInfo
 from stereomideval.eval import Eval, Timer
 from stereomideval import colormap_disp, image_resize
-from i3drsgm import I3DRSGM
+from i3drsgm import I3DRSGM, I3DRSGMAppAPI
 
 DATASET_FOLDER = os.path.join(os.getcwd(),"datasets") #Path to download datasets
 EVAL_FOLDER = os.path.join(os.getcwd(),"evaluation") #Path to store evaluation
@@ -22,8 +22,12 @@ GET_METRIC_RANK = False
 GET_AV_METRIC_RANK = True
 MIN_DISP = 0
 DISP_RANGE = 16*250
+WINDOW_SIZE = 5
+PYRAMID_LEVEL = 6
 INTERP = True
-DOWNSAMPLE_RATE = 1.0
+DOWNSAMPLE_RATE = 0.25
+
+#I3DRSGMAppAPI.download_app("1.0.9",True)
 
 # SSL Verificaiton may be need if you get the following error:
 # "urllib.error.URLError: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1091)>"
@@ -42,12 +46,14 @@ os.makedirs(EVAL_FOLDER)
 license_files = glob.glob("*.lic")
 if (len(license_files) <= 0):
     raise Exception("Failed to find license file in script directory.")
-i3drsgm = I3DRSGM(license_files[0])
+license_file = license_files[0]
+i3drsgm = I3DRSGM(license_file)
 # Check initalisation was success
 if i3drsgm.isInit():
     image_height, image_width = 0,0
     match_data_list = []
     # Get list of scenes in Milddlebury's stereo training dataset and iterate through them
+    #scene_info = SceneInfo(Dataset.Teddy, DatasetType.imperfect, 1.0)
     for scene_info in Dataset.get_training_scene_list():
         scene_name=scene_info.scene_name
         dataset_type=scene_info.dataset_type
@@ -64,24 +70,33 @@ if i3drsgm.isInit():
         right_image = scene_data.right_image
         ground_truth = scene_data.disp_image
         ndisp = scene_data.ndisp * DOWNSAMPLE_RATE
+        #ndisp = np.amax(ground_truth) * 4
+        #ndisp = ndisp * DOWNSAMPLE_RATE
 
         disp_range = DISP_RANGE
 
         left_image = cv2.resize(left_image,fx=DOWNSAMPLE_RATE,fy=DOWNSAMPLE_RATE,interpolation=cv2.INTER_AREA,dsize=None)
         right_image = cv2.resize(right_image,fx=DOWNSAMPLE_RATE,fy=DOWNSAMPLE_RATE,interpolation=cv2.INTER_AREA,dsize=None)
         ground_truth = cv2.resize(ground_truth,fx=DOWNSAMPLE_RATE,fy=DOWNSAMPLE_RATE,interpolation=cv2.INTER_AREA,dsize=None)
+        orig_dtype = ground_truth.dtype
+        ground_truth = ground_truth.astype(np.float32)
+        ground_truth *= DOWNSAMPLE_RATE
+        ground_truth = ground_truth.astype(orig_dtype)
 
         # Get test data image dims
         new_image_height = left_image.shape[0]
         new_image_width = left_image.shape[1]
+        print("{},{}".format(new_image_height,new_image_width))
         if new_image_height != image_height or new_image_width != image_width:
             # Re generate i3drsgm if image height is different
             i3drsgm.close()
-            i3drsgm = I3DRSGM("2020_02_21_I3DRWL001_WINDOWS.lic")
+            i3drsgm = I3DRSGM(license_file)
             # Set matcher parameters
-            i3drsgm.setMinDisparity(MIN_DISP)
-            i3drsgm.setDisparityRange(disp_range)
-            i3drsgm.enableInterpolation(INTERP)
+            res = i3drsgm.setWindowSize(WINDOW_SIZE)
+            res &= i3drsgm.setMinDisparity(MIN_DISP)
+            res &= i3drsgm.setDisparityRange(disp_range)
+            res &= i3drsgm.setPyamidLevel(PYRAMID_LEVEL)
+            res &= i3drsgm.enableInterpolation(INTERP)
             image_height, image_width = new_image_height, new_image_width
 
         # Start timer
@@ -104,19 +119,19 @@ if i3drsgm.isInit():
         test_disp_image = np.nan_to_num(test_disp_image, nan=0.0,posinf=0.0,neginf=0.0)
         test_disp_image = test_disp_image.astype(ground_truth.dtype)
 
-        print(ground_truth)
-        print(test_disp_image)
-
-        
+        #print(ndisp)
+        #print(ground_truth)
+        #print(test_disp_image)
 
         if valid:
             match_result = MatchData.MatchResult(
                 left_image,right_image,ground_truth,test_disp_image,elapsed_time,ndisp)
+            Eval.display_results(match_result,wait=1)
             match_data = MatchData(scene_info,match_result)
             match_data_list.append(match_data)
-            resize_disp_image = image_resize(colormap_disp(test_disp_image),width=480)
-            cv2.imshow("Match",resize_disp_image)
-            cv2.waitKey(1)
+            #resize_disp_image = image_resize(colormap_disp(test_disp_image),width=480)
+            #cv2.imshow("Match",resize_disp_image)
+            #cv2.waitKey(0)
         else:
             i3drsgm.close()
             raise Exception("Match failed!")
@@ -125,6 +140,7 @@ if i3drsgm.isInit():
     i3drsgm.close()
 
     Eval.evaluate_match_data_list(match_data_list,GET_METRIC_RANK,GET_AV_METRIC_RANK,INTERP)
+    #Eval.evaluate_match_result_list()
 else:
     # Required to release memory
     i3drsgm.close()
