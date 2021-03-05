@@ -70,6 +70,8 @@ def eval(i3drsgm,dataset_folder,display_images,min_disp,disp_range,window_size,p
         # Stereo match image pair
         print("Running I3DRSGM on images...")
         valid, test_disp_image = i3drsgm.forwardMatch(left_image,right_image)
+        # Record elapsed time for simulated match
+        elapsed_time = timer.elapsed()
 
         if (valid and test_disp_image is not None):
             # Record elapsed time for match
@@ -82,12 +84,14 @@ def eval(i3drsgm,dataset_folder,display_images,min_disp,disp_range,window_size,p
             test_disp_image = test_disp_image.astype(np.float32)
             test_disp_image[test_disp_image==99999]=0.0
             test_disp_image[test_disp_image<=0]=0.0
-            test_disp_image[test_disp_image>=ndisp]=ndisp
             test_disp_image = np.nan_to_num(test_disp_image, nan=0.0,posinf=0.0,neginf=0.0)
+            test_disp_image[test_disp_image>=ndisp]=ndisp
             test_disp_image = test_disp_image.astype(ground_truth_disp_image.dtype)
 
-            # Record elapsed time for simulated match
-            elapsed_time = timer.elapsed()
+            ground_truth_disp_image[ground_truth_disp_image<=0]=0.0
+            ground_truth_disp_image = np.nan_to_num(ground_truth_disp_image, nan=0.0,posinf=0.0,neginf=0.0)
+            ground_truth_disp_image[ground_truth_disp_image>=ndisp]=ndisp
+
             # Format match result into expected format for use in evaluation
             match_result = MatchData.MatchResult(
                 left_image,right_image,ground_truth_disp_image,test_disp_image,elapsed_time,ndisp)
