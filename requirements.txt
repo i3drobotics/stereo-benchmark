@@ -1,3 +1,4 @@
 stereo3d >= 0.0.3
 i3drsgm >= 1.0.9
-stereo-mideval >= 1.0.25
+stereo-mideval >= 1.0.26
+matplotlib
