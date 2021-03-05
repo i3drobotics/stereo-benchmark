@@ -128,7 +128,7 @@ if __name__=="__main__":
 
     # Matcher parameters
     MIN_DISP = 0
-    DISP_RANGE = 16*150
+    DISP_RANGE = 16*120
     WINDOW_SIZE = 5
     PYRAMID_LEVEL = 6
 
