@@ -114,6 +114,7 @@ def eval(i3drsgm,dataset_folder,display_images,min_disp,disp_range,window_size,p
             with open(RESULTS_CSV_PATH, mode='a') as results_file:
                 results_writer = csv.writer(results_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 results_writer.writerow(results_row)
+    i3drsgm.close()
 
 if __name__=="__main__":
     # Path to download datasets
@@ -123,7 +124,7 @@ if __name__=="__main__":
 
     # Matcher parameters
     MIN_DISP = 0
-    DISP_RANGE = 16*160
+    DISP_RANGE = 16*150
     WINDOW_SIZE = 5
     PYRAMID_LEVEL = 6
 
