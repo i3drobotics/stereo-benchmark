@@ -19,7 +19,7 @@ def eval(i3drsgm,dataset_folder,display_images,min_disp,disp_range,window_size,p
 
     metric_list = [" "]
     metric_list.extend(Metric.get_metrics_list())
-    with open(RESULTS_CSV_PATH, mode='w') as results_file:
+    with open(RESULTS_CSV_PATH, mode='w', newline='') as results_file:
         results_writer = csv.writer(results_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         results_writer.writerow(metric_list)
 
@@ -99,7 +99,7 @@ def eval(i3drsgm,dataset_folder,display_images,min_disp,disp_range,window_size,p
                 print("{}: {}".format(metric_result.metric,metric_result.result))
                 results_row.append(metric_result.result)
 
-            with open(RESULTS_CSV_PATH, mode='a') as results_file:
+            with open(RESULTS_CSV_PATH, mode='a', newline='') as results_file:
                 results_writer = csv.writer(results_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 results_writer.writerow(results_row)
 
@@ -111,7 +111,7 @@ def eval(i3drsgm,dataset_folder,display_images,min_disp,disp_range,window_size,p
         else:
             print("Matching failed")
             results_row = [scene_name]
-            with open(RESULTS_CSV_PATH, mode='a') as results_file:
+            with open(RESULTS_CSV_PATH, mode='a', newline='') as results_file:
                 results_writer = csv.writer(results_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 results_writer.writerow(results_row)
     i3drsgm.close()
