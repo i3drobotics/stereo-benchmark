@@ -94,6 +94,8 @@ for scene_name in all_scenes:
         test_disp_image = np.nan_to_num(test_disp_image, nan=0.0,posinf=0.0,neginf=0.0)
         test_disp_image[test_disp_image>=ndisp]=ndisp
         test_disp_image = test_disp_image.astype(ground_truth_disp_image.dtype)
+        if (scene_data == "Teddy" or scene_data == "Art"):
+            test_disp_image = np.rint(test_disp_image)
 
         ground_truth_disp_image[ground_truth_disp_image<=0]=0.0
         ground_truth_disp_image = np.nan_to_num(ground_truth_disp_image, nan=0.0,posinf=0.0,neginf=0.0)
