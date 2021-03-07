@@ -56,6 +56,8 @@ else:
 
 metric_list = [" "]
 metric_list.extend(Metric.get_metrics_list())
+metric_list.append("bad200_maskerr")
+metric_list.append("rms_maskerr")
 with open(RESULTS_CSV_PATH, mode='w', newline='') as results_file:
     results_writer = csv.writer(results_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     results_writer.writerow(metric_list)
@@ -101,6 +103,9 @@ for scene_name in all_scenes:
         ground_truth_disp_image = np.nan_to_num(ground_truth_disp_image, nan=0.0,posinf=0.0,neginf=0.0)
         ground_truth_disp_image[ground_truth_disp_image>=ndisp]=ndisp
 
+        ground_truth_mask_invalid = ground_truth_disp_image.copy()
+        ground_truth_mask_invalid[test_disp_image==0] = 0.0
+
         # Format match result into expected format for use in evaluation
         match_result = MatchData.MatchResult(
             left_image,right_image,ground_truth_disp_image,test_disp_image,elapsed_time,ndisp)
@@ -111,6 +116,18 @@ for scene_name in all_scenes:
             # Print metric and result
             print("{}: {}".format(metric_result.metric,metric_result.result))
             results_row.append(metric_result.result)
+
+        match_result_mask_invalid = MatchData.MatchResult(
+            left_image,right_image,ground_truth_mask_invalid,test_disp_image,elapsed_time,ndisp)
+        # Evalulate match results against all Middlebury metrics
+        metric_result_list_invalid = Eval.eval_all_metrics(match_result_mask_invalid)
+
+        for metric_result in metric_result_list_invalid:
+            if (metric_result.metric == "bad200" or metric_result.metric == "rms"):
+                metric_name = metric_result.metric+"_maskerr"
+                # Print metric and result
+                print("{}: {}".format(metric_name,metric_result.result))
+                results_row.append(metric_result.result)
 
         with open(RESULTS_CSV_PATH, mode='a', newline='') as results_file:
             results_writer = csv.writer(results_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
