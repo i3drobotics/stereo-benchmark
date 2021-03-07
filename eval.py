@@ -126,10 +126,10 @@ def eval(i3drsgm,dataset_folder,display_images,min_disp,disp_range,window_size,p
                 results_writer = csv.writer(results_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
                 results_writer.writerow(results_row)
 
-            #plt.figure(1)
-            #plt.imshow(ground_truth_disp_image)
-            #plt.figure(2)
-            #plt.imshow(test_disp_image)
+            plt.figure(1)
+            plt.imshow(ground_truth_disp_image)
+            plt.figure(2)
+            plt.imshow(test_disp_image)
             #plt.show()
         else:
             print("Matching failed")
@@ -148,8 +148,8 @@ if __name__=="__main__":
     # Matcher parameters
     MIN_DISP = 0
     DISP_RANGE = 16*120
-    WINDOW_SIZE = 5
-    PYRAMID_LEVEL = 6
+    WINDOW_SIZE = 11
+    PYRAMID_LEVEL = 7
 
     # Create dataset folder
     if not os.path.exists(DATASET_FOLDER):
@@ -174,7 +174,7 @@ if __name__=="__main__":
         disp_range=DISP_RANGE,
         window_size=WINDOW_SIZE,
         pyramid_level=PYRAMID_LEVEL,
-        interp=True
+        interp=False
     )
     eval(
         i3drsgm,
@@ -184,5 +184,5 @@ if __name__=="__main__":
         disp_range=DISP_RANGE,
         window_size=WINDOW_SIZE,
         pyramid_level=PYRAMID_LEVEL,
-        interp=False
+        interp=True
     )
