@@ -50,6 +50,52 @@ with open(RESULTS_CSV_PATH, mode='w', newline='') as results_file:
     results_writer = csv.writer(results_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     results_writer.writerow(metric_list)
 
+def sliding_window(image, stepSize, windowSize):
+	# slide a window across the image
+	for y in range(0, image.shape[0], stepSize):
+		for x in range(0, image.shape[1], stepSize):
+			# yield the current window
+			yield (x, y, image[y:y + windowSize[1], x:x + windowSize[0]])
+
+def compute_custom_match(left_image, right_image):
+    window_size = 128
+    step_size = 32
+    print("Running custom matcher...")
+    # loop over a sliding window of the left image
+    for (image_win_x, image_win_y, image_window) in sliding_window(right_image, stepSize=step_size, windowSize=(window_size, window_size)):
+        # if the window does not meet our desired window size, ignore it
+        if image_window.shape[0] != window_size or image_window.shape[1] != window_size:
+            continue
+
+        #right_display = right_image.copy()
+        #cv2.rectangle(right_display, (image_win_x, image_win_y), (image_win_x + window_size, image_win_y + window_size), 255, 2)
+        #right_display = cv2.resize(right_display,(640,480))
+        #cv2.imshow("Right window", right_display)
+        
+        for (search_win_x, search_win_y, search_window) in sliding_window(left_image, stepSize=step_size, windowSize=(window_size, window_size)):
+            # if the window does not meet our desired window size, ignore it
+            if search_window.shape[0] != window_size or search_window.shape[1] != window_size:
+                continue
+            
+            # only search along single horizontal sweep
+            if search_win_y > 0:
+                break
+            
+            offset_search_win_y = search_win_y + image_win_y
+            offset_search_win_x = search_win_x + image_win_x
+
+            if (offset_search_win_x > left_image.shape[1] - window_size):
+                break
+
+            #left_display = left_image.copy()
+            #cv2.rectangle(left_display, (offset_search_win_x, offset_search_win_y), (offset_search_win_x + window_size, offset_search_win_y + window_size), 255, 2)
+            #left_display = cv2.resize(left_display,(640,480))
+            #cv2.imshow("Left search", left_display)
+            #cv2.waitKey(1)
+    left_shape = left_image.shape
+    disp = np.zeros((left_shape[0],left_shape[1]))
+    return disp
+
 def compute_match(cv_matcher, left_image, right_image):
     img_shape = left_image.shape
     downscale_target = 500
@@ -218,6 +264,7 @@ for scene_name in all_scenes:
     print("Running stereo match...")
     test_disp_image_orig = compute_match_orig(cv_matcher, left_image_grey, right_image_grey)
     test_disp_image = compute_match(cv_matcher, left_image_grey, right_image_grey)
+    #test_disp_image = compute_custom_match(left_image,right_image)
     # Record elapsed time for simulated match
     elapsed_time = timer.elapsed()
     test_disp_image = test_disp_image.astype(np.float32) / 16.0
