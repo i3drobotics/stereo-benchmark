@@ -12,7 +12,7 @@ from stereomideval.eval import Eval, Timer, Metric
 DATASET_FOLDER = os.path.join(os.getcwd(),"datasets")
 # Display loaded scene data to OpenCV window
 DISPLAY_IMAGES = True
-STEREO_MATCHER = "SGBM" #BM or SGBM
+STEREO_MATCHER = "BM" #BM or SGBM
 
 # Create dataset folder
 if not os.path.exists(DATASET_FOLDER):
