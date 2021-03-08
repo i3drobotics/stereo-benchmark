@@ -4,6 +4,7 @@ import csv
 import numpy as np
 import cv2
 from matplotlib import pyplot as plt
+from skimage.metrics import structural_similarity
 from stereomideval.structures import MatchData
 from stereomideval.dataset import Dataset
 from stereomideval.eval import Eval, Timer, Metric
@@ -31,7 +32,7 @@ default_texture_threshold = 5
 default_speckle_size = 0
 default_speckle_range = 500
 
-RESULTS_CSV_PATH = "cvbm_downfill_eval_results.csv"
+RESULTS_CSV_PATH = "cm_eval_results.csv"
 cv_matcher = cv2.StereoBM_create()
 calc_block = (2 * default_block_size + 5)
 cv_matcher.setBlockSize(calc_block)
@@ -50,53 +51,92 @@ with open(RESULTS_CSV_PATH, mode='w', newline='') as results_file:
     results_writer = csv.writer(results_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     results_writer.writerow(metric_list)
 
-def sliding_window(image, stepSize, windowSize):
+def sliding_window(image, stepSize, windowSize, xOffset=0, yOffset=0, xMax=None, yMax=None):
 	# slide a window across the image
-	for y in range(0, image.shape[0], stepSize):
-		for x in range(0, image.shape[1], stepSize):
-			# yield the current window
-			yield (x, y, image[y:y + windowSize[1], x:x + windowSize[0]])
+    if (xMax is None):
+        xMax = image.shape[1]
+    if (yMax is None):
+        yMax = image.shape[0]
+    for y in range(yOffset, yMax-windowSize[1], stepSize[1]):
+        for x in range(xOffset, xMax-windowSize[0], stepSize[0]):
+            # yield the current window
+            yield (x, y, image[y:y + windowSize[1], x:x + windowSize[0]])
 
 def compute_custom_match(left_image, right_image):
-    window_size = 128
-    step_size = 32
+    window_size = (24,24)
+    step_size = (12,12)
+    max_disp = 200
+    minScore = 1.0
+    match_method = cv2.TM_CCORR_NORMED # TM_SQDIFF / TM_SQDIFF_NORMED / TM_CCORR / TM_CCORR_NORMED / TM_CCOEFF / TM_CCOEFF_NORMED
     print("Running custom matcher...")
-    # loop over a sliding window of the left image
-    for (image_win_x, image_win_y, image_window) in sliding_window(right_image, stepSize=step_size, windowSize=(window_size, window_size)):
-        # if the window does not meet our desired window size, ignore it
-        if image_window.shape[0] != window_size or image_window.shape[1] != window_size:
-            continue
+    # downsample images
+    downscale_factor = 1
+    downscale_amount = 1.0/float(downscale_factor)
+    up_size = (left_image.shape[1],left_image.shape[0])
+    left_image_down = cv2.resize(left_image,None,fx=downscale_amount,fy=downscale_amount,interpolation=cv2.INTER_AREA)
+    right_image_down = cv2.resize(right_image,None,fx=downscale_amount,fy=downscale_amount,interpolation=cv2.INTER_AREA)
 
-        #right_display = right_image.copy()
-        #cv2.rectangle(right_display, (image_win_x, image_win_y), (image_win_x + window_size, image_win_y + window_size), 255, 2)
-        #right_display = cv2.resize(right_display,(640,480))
-        #cv2.imshow("Right window", right_display)
-        
-        for (search_win_x, search_win_y, search_window) in sliding_window(left_image, stepSize=step_size, windowSize=(window_size, window_size)):
-            # if the window does not meet our desired window size, ignore it
-            if search_window.shape[0] != window_size or search_window.shape[1] != window_size:
-                continue
-            
-            # only search along single horizontal sweep
-            if search_win_y > 0:
-                break
-            
-            offset_search_win_y = search_win_y + image_win_y
-            offset_search_win_x = search_win_x + image_win_x
-
-            if (offset_search_win_x > left_image.shape[1] - window_size):
-                break
-
-            #left_display = left_image.copy()
-            #cv2.rectangle(left_display, (offset_search_win_x, offset_search_win_y), (offset_search_win_x + window_size, offset_search_win_y + window_size), 255, 2)
-            #left_display = cv2.resize(left_display,(640,480))
-            #cv2.imshow("Left search", left_display)
-            #cv2.waitKey(1)
-    left_shape = left_image.shape
+    left_shape = left_image_down.shape
     disp = np.zeros((left_shape[0],left_shape[1]))
-    return disp
+    # loop over a sliding window of the left image
+    for (image_win_x, image_win_y, image_window) in sliding_window(right_image_down, stepSize=step_size, windowSize=window_size):
+        # right_window = right_image_down.copy()
+        # cv2.rectangle(right_window, (image_win_x, image_win_y), (image_win_x + window_size[1], image_win_y + window_size[0]), 255, 2)
+        # right_window_display = cv2.resize(right_window,(640,480))
+        # cv2.imshow("Rect window", right_window_display)
+        # cv2.waitKey(1)
 
-def compute_match(cv_matcher, left_image, right_image):
+        # cv2.imshow("Image window", image_window)
+        # cv2.waitKey(1)
+
+        mask_crop = left_image_down[image_win_y:image_win_y+window_size[1],image_win_x:image_win_x+window_size[0]+int(max_disp * downscale_amount)].copy()
+
+        # cv2.imshow("Match mask", mask_crop)
+        # cv2.waitKey(1)
+
+        #process_timer.start()
+        result = cv2.matchTemplate(mask_crop, image_window, match_method)
+        #print("match template: {}".format(process_timer.elapsed()))
+        #process_timer.start()
+        cv2.normalize( result, result, 0, 1, cv2.NORM_MINMAX, -1 )
+        _minVal, _maxVal, minLoc, maxLoc = cv2.minMaxLoc(result, None)
+        #print("normalise & minmax: {}".format(process_timer.elapsed()))
+        if (match_method == cv2.TM_SQDIFF or match_method == cv2.TM_SQDIFF_NORMED):
+            matchLoc = minLoc
+            matchScore = 1-_minVal
+        else:
+            matchLoc = maxLoc
+            matchScore = _maxVal
+
+        #process_timer.start()
+        pixel_disp = matchLoc[0]
+        #print(pixel_disp)
+        if pixel_disp < (max_disp * downscale_amount) and matchScore >= minScore:
+            disp[image_win_y:image_win_y + window_size[1],image_win_x+pixel_disp:image_win_x + window_size[0]+pixel_disp] = pixel_disp
+        #print("check valid disparity: {}".format(process_timer.elapsed()))
+
+            #if (image_win_x == 0):
+
+        # left_window = left_image_down.copy()
+        # cv2.rectangle(left_window, (image_win_x + pixel_disp, image_win_y), (image_win_x + pixel_disp + window_size[0], image_win_y + window_size[1]), 255, 2)
+        # left_window = cv2.resize(left_window,(640,480))
+        # cv2.imshow("Window found", left_window)
+        # cv2.waitKey(1)
+
+        # if (image_win_x == 0):
+        #     plt.figure(1)
+        #     plt.imshow(left_window)
+        #     plt.figure(2)
+        #     plt.imshow(disp)
+        #     plt.show()
+
+    # upscale disparity and correct disparity value
+    disp_up = cv2.resize(disp, up_size, interpolation=cv2.INTER_CUBIC) * downscale_factor
+
+    disp_up = disp_up * 16
+    return disp_up
+
+def compute_downinfill_match(cv_matcher, left_image, right_image):
     img_shape = left_image.shape
     downscale_target = 500
     if (img_shape[1] < downscale_target):
@@ -151,87 +191,6 @@ def compute_match_orig(cv_matcher, left_image, right_image):
     disp = cv_matcher.compute(left_image, right_image)
     return disp
 
-def compute_match_intensity(cv_matcher, left_image, right_image):
-    # normalise left image
-    cv2.normalize(left_image, left_image, 0, 255, cv2.NORM_MINMAX)
-    cv2.normalize(right_image, right_image, 0, 255, cv2.NORM_MINMAX)
-    # create masks of left image based on intensity
-    mask1_intensity_l = cv2.inRange(left_image, 0, 50)
-    mask2_intensity_l = cv2.inRange(left_image, 50, 100)
-    mask3_intensity_l = cv2.inRange(left_image, 100, 150)
-    mask4_intensity_l = cv2.inRange(left_image, 150, 200)
-    mask5_intensity_l = cv2.inRange(left_image, 200, 255)
-
-    # create masks of right image based on intensity
-    mask1_intensity_r = cv2.inRange(right_image, 0, 50)
-    mask2_intensity_r = cv2.inRange(right_image, 50, 100)
-    mask3_intensity_r = cv2.inRange(right_image, 100, 150)
-    mask4_intensity_r = cv2.inRange(right_image, 150, 200)
-    mask5_intensity_r = cv2.inRange(right_image, 200, 255)
-
-    left_image_1 = cv2.bitwise_and(left_image, left_image, mask = mask1_intensity_l)
-    right_image_1 = cv2.bitwise_and(right_image, right_image, mask = mask1_intensity_r)
-    left_image_2 = cv2.bitwise_and(left_image, left_image, mask = mask2_intensity_l)
-    right_image_2 = cv2.bitwise_and(right_image, right_image, mask = mask2_intensity_r)
-    left_image_3 = cv2.bitwise_and(left_image, left_image, mask = mask3_intensity_l)
-    right_image_3 = cv2.bitwise_and(right_image, right_image, mask = mask3_intensity_r)
-    left_image_4 = cv2.bitwise_and(left_image, left_image, mask = mask4_intensity_l)
-    right_image_4 = cv2.bitwise_and(right_image, right_image, mask = mask4_intensity_r)
-    left_image_5 = cv2.bitwise_and(left_image, left_image, mask = mask5_intensity_l)
-    right_image_5 = cv2.bitwise_and(right_image, right_image, mask = mask5_intensity_r)
-
-    disp_orig = cv_matcher.compute(left_image, right_image)
-    disp_1 = cv_matcher.compute(left_image_1, right_image_1)
-    disp_2 = cv_matcher.compute(left_image_2, right_image_2)
-    disp_3 = cv_matcher.compute(left_image_3, right_image_3)
-    disp_4 = cv_matcher.compute(left_image_4, right_image_4)
-    disp_5 = cv_matcher.compute(left_image_5, right_image_5)
-
-    mask1_valid_l = np.zeros(disp_1.shape,np.uint8)
-    mask2_valid_l = np.zeros(disp_1.shape,np.uint8)
-    mask3_valid_l = np.zeros(disp_1.shape,np.uint8)
-    mask4_valid_l = np.zeros(disp_1.shape,np.uint8)
-    mask5_valid_l = np.zeros(disp_1.shape,np.uint8)
-    mask1_valid_l[disp_1!=-16] = 255
-    mask2_valid_l[disp_2!=-16] = 255
-    mask3_valid_l[disp_3!=-16] = 255
-    mask4_valid_l[disp_4!=-16] = 255
-    mask5_valid_l[disp_5!=-16] = 255
-
-    #mask1_valid_l = mask1_valid_l + mask1_intensity_l
-    #mask2_valid_l = mask2_valid_l + mask2_intensity_l
-    #mask3_valid_l = mask3_valid_l + mask3_intensity_l
-    #mask4_valid_l = mask4_valid_l + mask4_intensity_l
-    #mask5_valid_l = mask5_valid_l + mask5_intensity_l
-
-    not_mask1_intensity_l = cv2.bitwise_not(mask1_valid_l)
-    not_mask2_intensity_l = cv2.bitwise_not(mask2_valid_l)
-    not_mask3_intensity_l = cv2.bitwise_not(mask3_valid_l)
-    not_mask4_intensity_l = cv2.bitwise_not(mask4_valid_l)
-    not_mask5_intensity_l = cv2.bitwise_not(mask5_valid_l)
-
-    img1_bg = cv2.bitwise_and(disp_1,disp_1,mask = not_mask2_intensity_l)
-    img2_fg = cv2.bitwise_and(disp_2,disp_2,mask = mask2_valid_l)
-
-    disp = cv2.add(img1_bg,img2_fg)
-
-    img2_bg = cv2.bitwise_and(disp,disp,mask = not_mask3_intensity_l)
-    img3_fg = cv2.bitwise_and(disp_3,disp_3,mask = mask3_valid_l)
-
-    disp = cv2.add(img2_bg,img3_fg)
-
-    img3_bg = cv2.bitwise_and(disp,disp,mask = not_mask4_intensity_l)
-    img4_fg = cv2.bitwise_and(disp_4,disp_4,mask = mask4_valid_l)
-
-    disp = cv2.add(img3_bg,img4_fg)
-
-    img4_bg = cv2.bitwise_and(disp,disp,mask = not_mask5_intensity_l)
-    img5_fg = cv2.bitwise_and(disp_5,disp_5,mask = mask5_valid_l)
-
-    disp = cv2.add(img4_bg,img5_fg)
-
-    return disp
-
 def clean_disp(disp,ndisp):
     disp = disp.astype(np.float32)
     disp[disp==99999]=0.0
@@ -262,29 +221,29 @@ for scene_name in all_scenes:
     left_image_grey = cv2.cvtColor(left_image,cv2.COLOR_BGR2GRAY)
     right_image_grey = cv2.cvtColor(right_image,cv2.COLOR_BGR2GRAY)
     print("Running stereo match...")
-    test_disp_image_orig = compute_match_orig(cv_matcher, left_image_grey, right_image_grey)
-    test_disp_image = compute_match(cv_matcher, left_image_grey, right_image_grey)
-    #test_disp_image = compute_custom_match(left_image,right_image)
+    #test_disp_image_orig = compute_match_orig(cv_matcher, left_image_grey, right_image_grey)
+    #test_disp_image = compute_match(cv_matcher, left_image_grey, right_image_grey)
+    test_disp_image = compute_custom_match(left_image_grey,right_image_grey)
     # Record elapsed time for simulated match
     elapsed_time = timer.elapsed()
     test_disp_image = test_disp_image.astype(np.float32) / 16.0
-    test_disp_image_orig = test_disp_image_orig.astype(np.float32) / 16.0
+    #test_disp_image_orig = test_disp_image_orig.astype(np.float32) / 16.0
 
     if (test_disp_image is not None):
         test_disp_image = clean_disp(test_disp_image,ndisp)
-        test_disp_image_orig = clean_disp(test_disp_image_orig,ndisp)
+        #test_disp_image_orig = clean_disp(test_disp_image_orig,ndisp)
         test_disp_image = test_disp_image.astype(ground_truth_disp_image.dtype)
-        test_disp_image_orig = test_disp_image_orig.astype(ground_truth_disp_image.dtype)
+        #test_disp_image_orig = test_disp_image_orig.astype(ground_truth_disp_image.dtype)
         if (scene_data == "Teddy" or scene_data == "Art"):
             test_disp_image = np.rint(test_disp_image)
-            test_disp_image_orig = np.rint(test_disp_image_orig)
+            #test_disp_image_orig = np.rint(test_disp_image_orig)
 
         ground_truth_disp_image[ground_truth_disp_image<=0]=0.0
         ground_truth_disp_image = np.nan_to_num(ground_truth_disp_image, nan=0.0,posinf=0.0,neginf=0.0)
         ground_truth_disp_image[ground_truth_disp_image>=ndisp]=ndisp
 
         ground_truth_mask_invalid = ground_truth_disp_image.copy()
-        ground_truth_mask_invalid[test_disp_image_orig==0] = 0.0
+        ground_truth_mask_invalid[ground_truth_disp_image==0] = 0.0
 
         # Format match result into expected format for use in evaluation
         match_result = MatchData.MatchResult(
@@ -317,8 +276,8 @@ for scene_name in all_scenes:
 
         plt.figure(1)
         plt.imshow(ground_truth_disp_image)
-        plt.figure(2)
-        plt.imshow(test_disp_image_orig)
+        #plt.figure(2)
+        #plt.imshow(test_disp_image_orig)
         plt.figure(3)
         plt.imshow(test_disp_image)
         #plt.show()
