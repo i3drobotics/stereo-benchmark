@@ -18,10 +18,6 @@ STEREO_MATCHER = "BM" #BM or SGBM
 if not os.path.exists(DATASET_FOLDER):
     os.makedirs(DATASET_FOLDER)
 
-all_scenes = []
-for scene_info in Dataset.get_training_scene_list():
-    all_scenes.append(scene_info.scene_name)
-
 default_min_disp = 0
 default_num_disparities = 25
 default_block_size = 11
@@ -31,7 +27,7 @@ default_speckle_size = 0
 default_speckle_range = 500
 
 if STEREO_MATCHER == "BM":
-    RESULTS_CSV_PATH = "cvbm_eval_results.csv"
+    RESULTS_CSV_PATH = "eval_results_cvbm.csv"
     cv_matcher = cv2.StereoBM_create()
     calc_block = (2 * default_block_size + 5)
     cv_matcher.setBlockSize(calc_block)
@@ -42,7 +38,7 @@ if STEREO_MATCHER == "BM":
     cv_matcher.setSpeckleWindowSize(default_speckle_size)
     cv_matcher.setSpeckleRange(default_speckle_range)
 elif STEREO_MATCHER == "SGBM":
-    RESULTS_CSV_PATH = "cvsgbm_eval_results.csv"
+    RESULTS_CSV_PATH = "eval_results_cvsgbm.csv"
     cv_matcher = cv2.StereoSGBM_create()
     calc_block = (2 * default_block_size + 5)
     cv_matcher.setBlockSize(calc_block)
@@ -64,13 +60,15 @@ with open(RESULTS_CSV_PATH, mode='w', newline='') as results_file:
 
 # Download datasets from middlebury servers
 # will only download it if it hasn't already been downloaded
-for scene_name in all_scenes:
+for scene_info in Dataset.get_training_scene_list():
+    scene_name = scene_info.scene_name
+    scene_type = scene_info.dataset_type
     print("Downloading data for scene '"+scene_name+"'...")
-    Dataset.download_scene_data(scene_name,DATASET_FOLDER)
+    Dataset.download_scene_data(scene_name,DATASET_FOLDER,scene_type)
 
     # Load scene data from downloaded folder
     print("Loading data for scene '"+scene_name+"'...")
-    scene_data = Dataset.load_scene_data(scene_name,DATASET_FOLDER,DISPLAY_IMAGES)
+    scene_data = Dataset.load_scene_data(scene_name,DATASET_FOLDER,DISPLAY_IMAGES,dataset_type=scene_type)
     # Scene data class contains the following data:
     left_image = scene_data.left_image
     right_image = scene_data.right_image

@@ -32,7 +32,7 @@ default_texture_threshold = 5
 default_speckle_size = 0
 default_speckle_range = 500
 
-RESULTS_CSV_PATH = "cm_eval_results.csv"
+RESULTS_CSV_PATH = "eval_results_cm.csv"
 cv_matcher = cv2.StereoBM_create()
 calc_block = (2 * default_block_size + 5)
 cv_matcher.setBlockSize(calc_block)
@@ -201,13 +201,15 @@ def clean_disp(disp,ndisp):
 
 # Download datasets from middlebury servers
 # will only download it if it hasn't already been downloaded
-for scene_name in all_scenes:
+for scene_info in Dataset.get_training_scene_list():
+    scene_name = scene_info.scene_name
+    scene_type = scene_info.dataset_type
     print("Downloading data for scene '"+scene_name+"'...")
-    Dataset.download_scene_data(scene_name,DATASET_FOLDER)
+    Dataset.download_scene_data(scene_name,DATASET_FOLDER,scene_type)
 
     # Load scene data from downloaded folder
     print("Loading data for scene '"+scene_name+"'...")
-    scene_data = Dataset.load_scene_data(scene_name,DATASET_FOLDER,DISPLAY_IMAGES)
+    scene_data = Dataset.load_scene_data(scene_name,DATASET_FOLDER,DISPLAY_IMAGES,dataset_type=scene_type)
     # Scene data class contains the following data:
     left_image = scene_data.left_image
     right_image = scene_data.right_image

@@ -10,12 +10,12 @@ from stereomideval.dataset import Dataset
 from stereomideval.eval import Eval, Timer, Metric
 from i3drsgm import I3DRSGM
 
-def eval(i3drsgm,dataset_folder,display_images,min_disp,disp_range,window_size,pyramid_level,interp):
+def eval(i3drsgm,dataset_folder,display_images,min_disp,disp_range,window_size,pyramid_level,interp,RESULTS_CSV_PATH):
     # Results filepath
     if (interp):
-        RESULTS_CSV_PATH = "eval_results_wInterp.csv"
+        RESULTS_CSV_PATH = "eval_i3drsgm_results_wInterp.csv"
     else:
-        RESULTS_CSV_PATH = "eval_results.csv"
+        RESULTS_CSV_PATH = "eval_i3drsgm_results.csv"
 
     metric_list = [" "]
     metric_list.extend(Metric.get_metrics_list())
@@ -25,20 +25,18 @@ def eval(i3drsgm,dataset_folder,display_images,min_disp,disp_range,window_size,p
         results_writer = csv.writer(results_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         results_writer.writerow(metric_list)
 
-    all_scenes = []
-    for scene_info in Dataset.get_training_scene_list():
-        all_scenes.append(scene_info.scene_name)
-
     image_height, image_width = 0,0
     # Download datasets from middlebury servers
     # will only download it if it hasn't already been downloaded
-    for scene_name in all_scenes:
+    for scene_info in Dataset.get_training_scene_list():
+        scene_name = scene_info.scene_name
+        scene_type = scene_info.dataset_type
         print("Downloading data for scene '"+scene_name+"'...")
-        Dataset.download_scene_data(scene_name,dataset_folder)
+        Dataset.download_scene_data(scene_name,dataset_folder,scene_type)
 
         # Load scene data from downloaded folder
         print("Loading data for scene '"+scene_name+"'...")
-        scene_data = Dataset.load_scene_data(scene_name,dataset_folder,display_images)
+        scene_data = Dataset.load_scene_data(scene_name,dataset_folder,display_images,dataset_type=scene_type)
         # Scene data class contains the following data:
         left_image = scene_data.left_image
         right_image = scene_data.right_image
@@ -149,7 +147,6 @@ if __name__=="__main__":
     MIN_DISP = 0
     DISP_RANGE = 16*120
     WINDOW_SIZE = 11
-    PYRAMID_LEVEL = 7
 
     # Create dataset folder
     if not os.path.exists(DATASET_FOLDER):
@@ -173,8 +170,9 @@ if __name__=="__main__":
         min_disp=MIN_DISP,
         disp_range=DISP_RANGE,
         window_size=WINDOW_SIZE,
-        pyramid_level=PYRAMID_LEVEL,
-        interp=False
+        pyramid_level=6,
+        interp=False,
+        RESULTS_CSV_PATH="eval_results_i3drsgm.csv"
     )
     eval(
         i3drsgm,
@@ -183,6 +181,29 @@ if __name__=="__main__":
         min_disp=MIN_DISP,
         disp_range=DISP_RANGE,
         window_size=WINDOW_SIZE,
-        pyramid_level=PYRAMID_LEVEL,
-        interp=True
+        pyramid_level=6,
+        interp=True,
+        RESULTS_CSV_PATH="eval_results_i3drsgm_interp.csv"
+    )
+    eval(
+        i3drsgm,
+        dataset_folder=DATASET_FOLDER,
+        display_images=DISPLAY_IMAGES,
+        min_disp=MIN_DISP,
+        disp_range=DISP_RANGE,
+        window_size=WINDOW_SIZE,
+        pyramid_level=7,
+        interp=False,
+        RESULTS_CSV_PATH="eval_results_i3drsgm_sub.csv"
+    )
+    eval(
+        i3drsgm,
+        dataset_folder=DATASET_FOLDER,
+        display_images=DISPLAY_IMAGES,
+        min_disp=MIN_DISP,
+        disp_range=DISP_RANGE,
+        window_size=WINDOW_SIZE,
+        pyramid_level=7,
+        interp=True,
+        RESULTS_CSV_PATH="eval_results_i3drsgm_sub_interp.csv"
     )
